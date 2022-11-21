@@ -1,13 +1,13 @@
 import unittest
 import json
-from intavia_backend.models_v2 import InTaViaModelBaseClass
+from rdf_fastapi_utils.models import InTaViaModelBaseClass
 
 
 class TestInTaViaBaseClass(unittest.TestCase):
     def setUp(self) -> None:
-        with open("intavia_backend/tests/test_data.json") as f:
+        with open("rdf-fastapi-utils/rdf_fastapi_utils/tests/test_data.json") as f:
             self.test_data = json.load(f)
-        with open("intavia_backend/tests/test_data_events.json") as f:
+        with open("rdf-fastapi-utils/rdf_fastapi_utils/tests/test_data_events.json") as f:
             self.test_data_events = json.load(f)
         return super().setUp()
 

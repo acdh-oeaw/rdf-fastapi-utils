@@ -1,0 +1,42 @@
+[tool.black]
+line-length = 120
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+
+[tool.poetry]
+name = "rdf-fastapi-utils"
+version = "0.1.0"
+description = "Utils package for interacting with SPARQL endpoint via FastAPI"
+authors = ["Matthias Schlögl <matthias.schloegl@oeaw.ac.at>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "rdf_fastapi_utils"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pydantic = "^1.10.2"
+rdflib = "^6.2.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^22.10.0"
+flake8 = "^5.0.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
