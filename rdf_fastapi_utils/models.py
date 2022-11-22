@@ -21,14 +21,6 @@ class FieldConfigurationRDF(BaseModel):
         description="Callback function for deciding on the correct class for serialization. Function\
             gets two parameters: field and RDFData and needs to return the class to use.",
     )
-    variables: List[str] | None = Field(
-        None, description="List of variables to pass to the field. Rest of the variables is omiited."
-    )
-    variables_mapping: List[Tuple[str, str]] | None = Field(
-        None,
-        description="Mapping of RDF variables to those used in the models. List of Tuples \
-            `('RDFVariable', 'ModelVariable')`.",
-    )
 
 
 class InTaViaModelBaseClass(BaseModel):
@@ -144,43 +136,6 @@ class InTaViaModelBaseClass(BaseModel):
                 return f_name, f_class
         return None
 
-    def map_fields_data_bak(self, data: dict) -> dict:
-        """Unses the field information to map the RDF values to the correct fields
-
-        Args:
-            data (dict): input RDF data
-
-        Returns:
-            dict: resulting data using the correct maps
-        """
-        res = {}
-        for k, v in data.items():
-            mapped = False
-            if k == "results":
-                res[k] = v
-                continue
-            for field_names, field in self.__fields__.items():
-                if field.__module__ == "models":
-                    res[k] = v
-                    mapped = True
-                    break
-                if getattr(field.field_info.extra.get("rdfconfig"), "callback_function", False):
-                    v = getattr(field.field_info.extra.get("rdfconfig"), "callback_function")(v)
-                f_conf = field.field_info.extra.get("rdfconfig", object())
-                if hasattr(f_conf, "path"):
-                    if f_conf.path == k:
-                        res[field_names] = v
-                        mapped = True
-                        break
-                else:
-                    if field_names == k:
-                        res[field_names] = v
-                        mapped = True
-                        break
-            if not mapped:
-                res[k] = v
-        return res
-
     def get_rdf_variables_from_field(self, field: ModelField) -> typing.List[str]:
         res = []
         for f_name, f_class in field.type_.__fields__.items():
@@ -238,39 +193,10 @@ class InTaViaModelBaseClass(BaseModel):
                         list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
                     )
             else:
-                res[field.name] = data.get(path, None)
+                default_value = getattr(field.field_info.extra.get("rdfconfig"), "default_value", None)
+                res[field.name] = data.get(path, default_value)
         return res
 
     def __init__(__pydantic_self__, **data: Any) -> None:
-        # if isinstance(__pydantic_self__, PaginatedResponseEntities):
-        #     super().__init__(**data)
         data = __pydantic_self__.map_fields_data(data=data)
-        # for field in __pydantic_self__.__fields__.values():
-        #     if field.type_.__module__ != "pydantic.types":
-        #         anch_f = __pydantic_self__.get_anchor_element_from_field(field=field)
-        #         if anch_f is not None:
-        #             anch_f = anch_f[0]
-        #         rdf_data = __pydantic_self__.filter_sparql(data=data, anchor=anch_f)
-        #         cb1 = getattr(field.field_info.extra.get("rdfconfig", object()), "serialization_class_callback", False)
-        #         # if isinstance(__pydantic_self__, PaginatedResponseEntities) and field.name == "results":
-        #         #     rdf_data = rdf_data[0]["results"]
-        #         if rdf_data is not None:
-        #             if len(rdf_data) > 0:
-        #                 if isinstance(rdf_data, list) and field.outer_type_.__name__ in ["list", "Union"]:
-        #                     if cb1:
-        #                         data[field.name] = [cb1(field, item)(**item) for item in rdf_data]
-        #                     else:
-        #                         data[field.name] = [field.type_(**item) for item in rdf_data]
-        #                 elif (
-        #                     isinstance(rdf_data, list)
-        #                     and field.outer_type_ != list
-        #                     and field.type_.__module__ == "builtins"
-        #                 ):
-        #                     if field.name in rdf_data[0]:
-        #                         data[field.name] = field.type_(rdf_data[0][field.name])
-        #                 elif isinstance(rdf_data, list) and field.outer_type_ != list:
-        #                     data[field.name] = field.type_(**rdf_data[0])
-        #                 else:
-        #                     data[field.name] = field.type_(**rdf_data)
-        #                 print("init")
         super().__init__(**data)
