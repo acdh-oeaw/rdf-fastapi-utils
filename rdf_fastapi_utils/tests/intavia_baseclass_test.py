@@ -2,10 +2,10 @@ from typing import Union
 import unittest
 import json
 from pydantic import Field
-from rdf_fastapi_utils.models import FieldConfigurationRDF, InTaViaModelBaseClass
+from rdf_fastapi_utils.models import FieldConfigurationRDF, RDFUtilsModelBaseClass
 
 
-class TCPaginatedResponse(InTaViaModelBaseClass):
+class TCPaginatedResponse(RDFUtilsModelBaseClass):
     count: int = Field(..., rdfconfig=FieldConfigurationRDF(path="count"))
     results: list[Union["TCPersonFull", "TCPlaceFull"]] = Field(
         ...,
@@ -13,19 +13,19 @@ class TCPaginatedResponse(InTaViaModelBaseClass):
     )
 
 
-class TCPersonFull(InTaViaModelBaseClass):
+class TCPersonFull(RDFUtilsModelBaseClass):
     id: str = Field(..., rdfconfig=FieldConfigurationRDF(anchor=True, path="person"))
     name: str = Field(..., rdfconfig=FieldConfigurationRDF(path="entityLabel"))
     events: list["TCEventFull"] = None
 
 
-class TCPlaceFull(InTaViaModelBaseClass):
+class TCPlaceFull(RDFUtilsModelBaseClass):
     id: str = Field(..., rdfconfig=FieldConfigurationRDF(anchor=True, path="person"))
     name: str = Field(..., rdfconfig=FieldConfigurationRDF(path="entityLabel"))
     events: list["TCEventFull"] = None
 
 
-class TCEventFull(InTaViaModelBaseClass):
+class TCEventFull(RDFUtilsModelBaseClass):
     id: str = Field(..., rdfconfig=FieldConfigurationRDF(anchor=True, path="event"))
     label: str = Field(..., rdfconfig=FieldConfigurationRDF(path="eventLabel"))
 

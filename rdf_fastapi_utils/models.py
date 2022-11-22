@@ -23,7 +23,7 @@ class FieldConfigurationRDF(BaseModel):
     )
 
 
-class InTaViaModelBaseClass(BaseModel):
+class RDFUtilsModelBaseClass(BaseModel):
     @staticmethod
     def harm_filter_sparql(data: list) -> list | None:
         for ent in data:  # FIXME: this is a hack to fix the problem with the filter_sparql function
