@@ -1,6 +1,38 @@
+from typing import Union
 import unittest
 import json
-from rdf_fastapi_utils.models import InTaViaModelBaseClass
+from pydantic import Field
+from rdf_fastapi_utils.models import FieldConfigurationRDF, InTaViaModelBaseClass
+
+
+class TCPaginatedResponse(InTaViaModelBaseClass):
+    count: int = Field(..., rdfconfig=FieldConfigurationRDF(path="count"))
+    results: list[Union["TCPersonFull", "TCPlaceFull"]] = Field(
+        ...,
+        rdfconfig=FieldConfigurationRDF(path="results", serialization_class_callback=lambda field, item: TCPersonFull),
+    )
+
+
+class TCPersonFull(InTaViaModelBaseClass):
+    id: str = Field(..., rdfconfig=FieldConfigurationRDF(anchor=True, path="person"))
+    name: str = Field(..., rdfconfig=FieldConfigurationRDF(path="entityLabel"))
+    events: list["TCEventFull"] = None
+
+
+class TCPlaceFull(InTaViaModelBaseClass):
+    id: str = Field(..., rdfconfig=FieldConfigurationRDF(anchor=True, path="person"))
+    name: str = Field(..., rdfconfig=FieldConfigurationRDF(path="entityLabel"))
+    events: list["TCEventFull"] = None
+
+
+class TCEventFull(InTaViaModelBaseClass):
+    id: str = Field(..., rdfconfig=FieldConfigurationRDF(anchor=True, path="event"))
+    label: str = Field(..., rdfconfig=FieldConfigurationRDF(path="eventLabel"))
+
+
+TCPaginatedResponse.update_forward_refs()
+TCPersonFull.update_forward_refs()
+TCEventFull.update_forward_refs()
 
 
 class TestInTaViaBaseClass(unittest.TestCase):
@@ -13,7 +45,7 @@ class TestInTaViaBaseClass(unittest.TestCase):
 
     def test_filter_sparql(self):
         res = InTaViaModelBaseClass().filter_sparql(self.test_data["results"], anchor="person")
-        self.assertEqual(len(res), 2)
+        self.assertEqual(len(res), 50)
 
     def test_filter_sparql_no_values_selected(self):
         res = InTaViaModelBaseClass().filter_sparql(self.test_data["results"], anchor="person", list_of_keys=None)
@@ -35,3 +67,7 @@ class TestInTaViaBaseClass(unittest.TestCase):
             res[0]["_additional_values"], anchor="event", list_of_keys=["event", "eventLabel", "start"]
         )
         self.assertEqual(len(res2), 14)
+
+    def test_model_field(self):
+        res = TCPaginatedResponse(**self.test_data_events)
+        self.assertEqual(len(res.results[0].events), 14)

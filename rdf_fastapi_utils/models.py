@@ -2,6 +2,7 @@ from copy import deepcopy
 from typing import Any, Callable, List, Tuple
 import typing
 from pydantic import BaseModel, Field, constr
+from pydantic.fields import ModelField
 
 
 class FieldConfigurationRDF(BaseModel):
@@ -72,7 +73,6 @@ class InTaViaModelBaseClass(BaseModel):
             data = data_res
         if len(data) == 0:
             return None
-        res = []
         # if list_of_keys is not None:
         #     data = [{k: v for k, v in d.items() if k in list_of_keys or k in additional_values} for d in data]
         if list_of_keys is None:
@@ -86,7 +86,7 @@ class InTaViaModelBaseClass(BaseModel):
             res_fin_anchor = []
             for item in lst_unique_vals:
                 add_vals = []
-                res1 = {}
+                res1 = {"_additional_values": []}
                 for i2 in list(filter(lambda d: d[anchor] == item, data)):
                     add_vals_dict = deepcopy(i2)
                     for k, v in i2.items():
@@ -110,7 +110,167 @@ class InTaViaModelBaseClass(BaseModel):
                         if add_vals_dict not in add_vals:
                             add_vals.append(add_vals_dict)
                 if len(add_vals) > 0:
-                    res1["_additional_values"] = add_vals
+                    res1["_additional_values"].extend(add_vals)
                 res_fin_anchor.append(res1)
             return self.harm_filter_sparql(res_fin_anchor)
         return self.harm_filter_sparql(data)
+
+    def get_anchor_element_from_field(self, field: ModelField) -> typing.Tuple[str, ModelField] | None:
+        """takes a field class and returns a tuple of the anchor element and the field class
+
+        Args:
+            field (ModelField): the field class
+
+        Returns:
+            typing.Tuple[str, ModelField] | None: tuple of name and field class of the anchor element, None if no anchor element
+        """
+        if not getattr(field.type_, "__fields__", False):
+            return None
+        for f_name, f_class in field.type_.__fields__.items():
+            f_conf = f_class.field_info.extra.get("rdfconfig", object())
+            if getattr(f_conf, "anchor", False):
+                if getattr(f_conf, "path", False):
+                    f_name = getattr(f_conf, "path")
+                return f_name, f_class
+        return None
+
+    def get_anchor_element_from_model(self, model: BaseModel) -> typing.Tuple[str, ModelField] | None:
+        """takes a model class and returns a tuple of the anchor element and the field class"""
+        for f_name, f_class in model.__fields__.items():
+            f_conf = f_class.field_info.extra.get("rdfconfig", object())
+            if getattr(f_conf, "anchor", False):
+                if getattr(f_conf, "path", False):
+                    f_name = getattr(f_conf, "path")
+                return f_name, f_class
+        return None
+
+    def map_fields_data_bak(self, data: dict) -> dict:
+        """Unses the field information to map the RDF values to the correct fields
+
+        Args:
+            data (dict): input RDF data
+
+        Returns:
+            dict: resulting data using the correct maps
+        """
+        res = {}
+        for k, v in data.items():
+            mapped = False
+            if k == "results":
+                res[k] = v
+                continue
+            for field_names, field in self.__fields__.items():
+                if field.__module__ == "models":
+                    res[k] = v
+                    mapped = True
+                    break
+                if getattr(field.field_info.extra.get("rdfconfig"), "callback_function", False):
+                    v = getattr(field.field_info.extra.get("rdfconfig"), "callback_function")(v)
+                f_conf = field.field_info.extra.get("rdfconfig", object())
+                if hasattr(f_conf, "path"):
+                    if f_conf.path == k:
+                        res[field_names] = v
+                        mapped = True
+                        break
+                else:
+                    if field_names == k:
+                        res[field_names] = v
+                        mapped = True
+                        break
+            if not mapped:
+                res[k] = v
+        return res
+
+    def get_rdf_variables_from_field(self, field: ModelField) -> typing.List[str]:
+        res = []
+        for f_name, f_class in field.type_.__fields__.items():
+            f_conf = f_class.field_info.extra.get("rdfconfig", object())
+            if hasattr(f_conf, "path"):
+                res.append(f_conf.path)
+            else:
+                res.append(f_name)
+        return res
+
+    def get_rdf_variables_from_model(self, model: BaseModel) -> typing.List[str]:
+        res = []
+        for f_name, f_class in model.__fields__.items():
+            f_conf = f_class.field_info.extra.get("rdfconfig", object())
+            if hasattr(f_conf, "path"):
+                res.append(f_conf.path)
+            else:
+                res.append(f_name)
+        return res
+
+    def map_fields_data(self, data: dict) -> dict:
+        """Unses the field information to map the RDF values to the correct fields
+
+        Args:
+            data (dict): input RDF data
+
+        Returns:
+            dict: resulting data using the correct maps
+        """
+        res = {}
+        for field in self.__fields__.values():
+            path = getattr(field.field_info.extra.get("rdfconfig"), "path", field.name)
+            if field.outer_type_ != field.type_:
+                scallback_attr = getattr(field.field_info.extra.get("rdfconfig"), "serialization_class_callback", None)
+                if scallback_attr is not None:
+                    res[field.name] = []
+                    if not isinstance(data[path], list):
+                        data[path] = [data[path]]
+                    # for ent in data[path]:
+                    cb = scallback_attr(field, data[path])
+                    anchor = self.get_anchor_element_from_model(model=cb)
+                    rdf_data = self.filter_sparql(
+                        data=data["_additional_values"] if "_additional_values" in data else data[path],
+                        anchor=anchor[0],
+                        list_of_keys=self.get_rdf_variables_from_model(model=cb),
+                    )
+                    res[field.name] = [cb(**ent) for ent in rdf_data]
+                    if field.outer_type_.__origin__ != list:
+                        res[field.name] = res[field.name][0]
+                else:
+                    anchor = self.get_anchor_element_from_model(model=field.type_)
+                    res[field.name] = self.filter_sparql(
+                        data=data["_additional_values"],
+                        anchor=anchor[0],
+                        list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
+                    )
+            else:
+                res[field.name] = data.get(path, None)
+        return res
+
+    def __init__(__pydantic_self__, **data: Any) -> None:
+        # if isinstance(__pydantic_self__, PaginatedResponseEntities):
+        #     super().__init__(**data)
+        data = __pydantic_self__.map_fields_data(data=data)
+        # for field in __pydantic_self__.__fields__.values():
+        #     if field.type_.__module__ != "pydantic.types":
+        #         anch_f = __pydantic_self__.get_anchor_element_from_field(field=field)
+        #         if anch_f is not None:
+        #             anch_f = anch_f[0]
+        #         rdf_data = __pydantic_self__.filter_sparql(data=data, anchor=anch_f)
+        #         cb1 = getattr(field.field_info.extra.get("rdfconfig", object()), "serialization_class_callback", False)
+        #         # if isinstance(__pydantic_self__, PaginatedResponseEntities) and field.name == "results":
+        #         #     rdf_data = rdf_data[0]["results"]
+        #         if rdf_data is not None:
+        #             if len(rdf_data) > 0:
+        #                 if isinstance(rdf_data, list) and field.outer_type_.__name__ in ["list", "Union"]:
+        #                     if cb1:
+        #                         data[field.name] = [cb1(field, item)(**item) for item in rdf_data]
+        #                     else:
+        #                         data[field.name] = [field.type_(**item) for item in rdf_data]
+        #                 elif (
+        #                     isinstance(rdf_data, list)
+        #                     and field.outer_type_ != list
+        #                     and field.type_.__module__ == "builtins"
+        #                 ):
+        #                     if field.name in rdf_data[0]:
+        #                         data[field.name] = field.type_(rdf_data[0][field.name])
+        #                 elif isinstance(rdf_data, list) and field.outer_type_ != list:
+        #                     data[field.name] = field.type_(**rdf_data[0])
+        #                 else:
+        #                     data[field.name] = field.type_(**rdf_data)
+        #                 print("init")
+        super().__init__(**data)
