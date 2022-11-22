@@ -21,7 +21,7 @@ profile = "black"
 
 [tool.poetry]
 name = "rdf-fastapi-utils"
-version = "0.1.0"
+version = "0.1.3"
 description = "Utils package for interacting with SPARQL endpoint via FastAPI"
 authors = ["Matthias Schlögl <matthias.schloegl@oeaw.ac.at>"]
 license = "MIT"
