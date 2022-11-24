@@ -167,8 +167,12 @@ class RDFUtilsModelBaseClass(BaseModel):
         """
         res = {}
         for field in self.__fields__.values():
-            path = getattr(field.field_info.extra.get("rdfconfig"), "path", field.name)
-            if field.outer_type_ != field.type_:
+            path = getattr(field.field_info.extra.get("rdfconfig"), "path", None)
+            if path is None:
+                path = field.name
+            if (field.outer_type_ != field.type_) or getattr(
+                field.field_info.extra.get("rdfconfig"), "serialization_class_callback", False
+            ):  # FIXME: this test doesnt catch all the options
                 scallback_attr = getattr(field.field_info.extra.get("rdfconfig"), "serialization_class_callback", None)
                 if scallback_attr is not None:
                     res[field.name] = []
@@ -188,7 +192,7 @@ class RDFUtilsModelBaseClass(BaseModel):
                 else:
                     anchor = self.get_anchor_element_from_model(model=field.type_)
                     res[field.name] = self.filter_sparql(
-                        data=data["_additional_values"],
+                        data=data["_additional_values"] if "_additional_values" in data else data[path],
                         anchor=anchor[0],
                         list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
                     )
@@ -198,5 +202,9 @@ class RDFUtilsModelBaseClass(BaseModel):
         return res
 
     def __init__(__pydantic_self__, **data: Any) -> None:
+        if "_results" in data:
+            data = data["_results"]
+            anchor = __pydantic_self__.get_anchor_element_from_model(model=__pydantic_self__)
+            data = __pydantic_self__.filter_sparql(data, anchor=anchor[0])[0]
         data = __pydantic_self__.map_fields_data(data=data)
         super().__init__(**data)

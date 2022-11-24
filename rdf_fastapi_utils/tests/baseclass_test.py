@@ -44,26 +44,26 @@ class TestInTaViaBaseClass(unittest.TestCase):
         return super().setUp()
 
     def test_filter_sparql(self):
-        res = InTaViaModelBaseClass().filter_sparql(self.test_data["results"], anchor="person")
+        res = RDFUtilsModelBaseClass().filter_sparql(self.test_data["results"], anchor="person")
         self.assertEqual(len(res), 50)
 
     def test_filter_sparql_no_values_selected(self):
-        res = InTaViaModelBaseClass().filter_sparql(self.test_data["results"], anchor="person", list_of_keys=None)
+        res = RDFUtilsModelBaseClass().filter_sparql(self.test_data["results"], anchor="person", list_of_keys=None)
         for ent in res:
-            self.assertFalse("_additional_values" in ent)
+            self.assertTrue("_additional_values" in ent)
 
     def test_filter_sparql_values_selected(self):
-        res = InTaViaModelBaseClass().filter_sparql(
+        res = RDFUtilsModelBaseClass().filter_sparql(
             self.test_data["results"], anchor="person", list_of_keys=["person", "entityLabel"]
         )
         for ent in res:
             self.assertTrue("_additional_values" in ent)
 
     def test_complex_example(self):
-        res = InTaViaModelBaseClass().filter_sparql(
+        res = RDFUtilsModelBaseClass().filter_sparql(
             self.test_data_events["results"], anchor="person", list_of_keys=["person", "entityLabel"]
         )
-        res2 = InTaViaModelBaseClass().filter_sparql(
+        res2 = RDFUtilsModelBaseClass().filter_sparql(
             res[0]["_additional_values"], anchor="event", list_of_keys=["event", "eventLabel", "start"]
         )
         self.assertEqual(len(res2), 14)
