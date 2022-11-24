@@ -78,7 +78,7 @@ class RDFUtilsModelBaseClass(BaseModel):
             res_fin_anchor = []
             for item in lst_unique_vals:
                 add_vals = []
-                res1 = {"_additional_values": []}
+                res1 = {}
                 for i2 in list(filter(lambda d: d[anchor] == item, data)):
                     add_vals_dict = deepcopy(i2)
                     for k, v in i2.items():
@@ -102,7 +102,10 @@ class RDFUtilsModelBaseClass(BaseModel):
                         if add_vals_dict not in add_vals:
                             add_vals.append(add_vals_dict)
                 if len(add_vals) > 0:
-                    res1["_additional_values"].extend(add_vals)
+                    if not "_additional_values" in res1:
+                        res1["_additional_values"] = add_vals
+                    else:
+                        res1["_additional_values"].extend(add_vals)
                 res_fin_anchor.append(res1)
             return self.harm_filter_sparql(res_fin_anchor)
         return self.harm_filter_sparql(data)
@@ -170,9 +173,8 @@ class RDFUtilsModelBaseClass(BaseModel):
             path = getattr(field.field_info.extra.get("rdfconfig"), "path", None)
             if path is None:
                 path = field.name
-            if (field.outer_type_ != field.type_) or getattr(
-                field.field_info.extra.get("rdfconfig"), "serialization_class_callback", False
-            ):  # FIXME: this test doesnt catch all the options
+            if hasattr(field.type_, "__fields__"):  # FIXME: this test doesnt catch all the options
+
                 scallback_attr = getattr(field.field_info.extra.get("rdfconfig"), "serialization_class_callback", None)
                 if scallback_attr is not None:
                     res[field.name] = []
@@ -192,7 +194,7 @@ class RDFUtilsModelBaseClass(BaseModel):
                 else:
                     anchor = self.get_anchor_element_from_model(model=field.type_)
                     res[field.name] = self.filter_sparql(
-                        data=data["_additional_values"] if "_additional_values" in data else data[path],
+                        data=data["_additional_values"] if "_additional_values" in data else data,
                         anchor=anchor[0],
                         list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
                     )
