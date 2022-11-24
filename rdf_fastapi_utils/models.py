@@ -108,7 +108,24 @@ class RDFUtilsModelBaseClass(BaseModel):
                         res1["_additional_values"].extend(add_vals)
                 res_fin_anchor.append(res1)
             return self.harm_filter_sparql(res_fin_anchor)
-        return self.harm_filter_sparql(data)
+        else:
+            res_fin = []
+            for i1 in data:
+                for k, v in i1.items():
+                    if k in list_of_keys:
+                        if isinstance(v, list):
+                            for count, it in enumerate(v):
+                                if len(res_fin) - 1 < count:
+                                    res_fin.append({k: it})
+                                else:
+                                    res_fin[count][k] = it
+                        else:
+                            if len(res_fin) > 0:
+                                res_fin[0][k] = v
+                            else:
+                                res_fin.append({k: v})
+            return self.harm_filter_sparql(res_fin)
+        # return self.harm_filter_sparql(data)
 
     def get_anchor_element_from_field(self, field: ModelField) -> typing.Tuple[str, ModelField] | None:
         """takes a field class and returns a tuple of the anchor element and the field class
@@ -195,7 +212,7 @@ class RDFUtilsModelBaseClass(BaseModel):
                     anchor = self.get_anchor_element_from_model(model=field.type_)
                     res[field.name] = self.filter_sparql(
                         data=data["_additional_values"] if "_additional_values" in data else data,
-                        anchor=anchor[0],
+                        anchor=anchor[0] if anchor is not None else None,
                         list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
                     )
             else:
@@ -203,10 +220,21 @@ class RDFUtilsModelBaseClass(BaseModel):
                 res[field.name] = data.get(path, default_value)
         return res
 
+    def post_process_data(self, data: dict) -> dict:
+
+        for field in self.__fields__.values():
+            cb = getattr(field.field_info.extra.get("rdfconfig"), "callback_function", None)
+            if cb is not None:
+                data[field.name] = cb(field, data[field.name], data)
+        return data
+
     def __init__(__pydantic_self__, **data: Any) -> None:
         if "_results" in data:
             data = data["_results"]
             anchor = __pydantic_self__.get_anchor_element_from_model(model=__pydantic_self__)
             data = __pydantic_self__.filter_sparql(data, anchor=anchor[0])[0]
         data = __pydantic_self__.map_fields_data(data=data)
+        data = __pydantic_self__.post_process_data(data=data)
+        # if "label" in data:
+        #     data["label"] = data["label"][0]
         super().__init__(**data)
