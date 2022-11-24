@@ -50,6 +50,9 @@ class RDFUtilsModelBaseClass(BaseModel):
         Returns:
             typing.List[dict] | None: list of dictionaries containing keys and values
         """
+        if isinstance(data, list):
+            if not isinstance(data[0], dict):
+                return data
         if isinstance(data, dict):
             data = [data]
         if additional_values is None:
@@ -208,10 +211,20 @@ class RDFUtilsModelBaseClass(BaseModel):
                     res[field.name] = [cb(**ent) for ent in rdf_data]
                     if field.outer_type_.__origin__ != list:
                         res[field.name] = res[field.name][0]
+                elif isinstance(data[path], list):
+                    anchor = self.get_anchor_element_from_model(model=field.type_)
+                    res[field.name] = self.filter_sparql(
+                        # data=data["_additional_values"] if "_additional_values" in data else data[path],
+                        data=data[path],
+                        anchor=anchor[0] if anchor is not None else None,
+                        list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
+                    )
+                    print("test")
                 else:
                     anchor = self.get_anchor_element_from_model(model=field.type_)
                     res[field.name] = self.filter_sparql(
-                        data=data["_additional_values"] if "_additional_values" in data else data,
+                        # data=data["_additional_values"] if "_additional_values" in data else data,
+                        data=data,
                         anchor=anchor[0] if anchor is not None else None,
                         list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
                     )
