@@ -1,4 +1,5 @@
 from copy import deepcopy
+import datetime
 from typing import Any, Callable, List, Tuple
 import typing
 from pydantic import BaseModel, Field, constr
@@ -8,7 +9,7 @@ from pydantic.fields import ModelField
 class FieldConfigurationRDF(BaseModel):
     """Configuration for how to use RDF data in the field"""
 
-    path: constr(regex="^[a-zA-Z0-9\.]+$") | None = Field(
+    path: constr(regex="^[a-zA-Z0-9\._]+$") | None = Field(
         None, description="RDF variable to use for populating the field"
     )
     anchor: bool = Field(False, description="Whether to use the RDF variable as an anchor")
@@ -92,13 +93,12 @@ class RDFUtilsModelBaseClass(BaseModel):
                             if k not in res1:
                                 res1[k] = v
                             else:
-                                if isinstance(res1[k], str):
-                                    if v != res1[k]:
-                                        res1[k] = [res1[k], v]
-                                elif isinstance(res1[k], int):
-                                    if v != res1[k]:
-                                        res1[k] = [res1[k], v]
-                                elif isinstance(res1[k], float):
+                                if (
+                                    isinstance(res1[k], str)
+                                    or isinstance(res1[k], int)
+                                    or isinstance(res1[k], float)
+                                    or isinstance(res1[k], datetime.datetime)
+                                ):
                                     if v != res1[k]:
                                         res1[k] = [res1[k], v]
                                 elif v not in res1[k]:
@@ -196,6 +196,8 @@ class RDFUtilsModelBaseClass(BaseModel):
             path = getattr(field.field_info.extra.get("rdfconfig"), "path", None)
             if path is None:
                 path = field.name
+            if path not in data:
+                continue
             if hasattr(field.type_, "__fields__"):  # FIXME: this test doesnt catch all the options
 
                 scallback_attr = getattr(field.field_info.extra.get("rdfconfig"), "serialization_class_callback", None)
@@ -257,7 +259,7 @@ class RDFUtilsModelBaseClass(BaseModel):
 
         for field in self.__fields__.values():
             cb = getattr(field.field_info.extra.get("rdfconfig"), "callback_function", None)
-            if cb is not None:
+            if cb is not None and field.name in data:
                 data[field.name] = cb(field, data[field.name], data)
         return data
 
