@@ -21,6 +21,9 @@ class FieldConfigurationRDF(BaseModel):
         description="Callback function for deciding on the correct class for serialization. Function\
             gets two parameters: field and RDFData and needs to return the class to use.",
     )
+    default_dict_key: constr(regex="^[a-zA-Z0-9_]+$") | None = Field(
+        None, desctiption="In a related field use this key as default"
+    )
 
 
 class RDFUtilsModelBaseClass(BaseModel):
@@ -196,6 +199,7 @@ class RDFUtilsModelBaseClass(BaseModel):
             if hasattr(field.type_, "__fields__"):  # FIXME: this test doesnt catch all the options
 
                 scallback_attr = getattr(field.field_info.extra.get("rdfconfig"), "serialization_class_callback", None)
+                default_dict_key = getattr(field.field_info.extra.get("rdfconfig"), "default_dict_key", None)
                 if scallback_attr is not None:
                     res[field.name] = []
                     if not isinstance(data[path], list):
@@ -211,6 +215,22 @@ class RDFUtilsModelBaseClass(BaseModel):
                     res[field.name] = [cb(**ent) for ent in rdf_data]
                     if field.outer_type_.__origin__ != list:
                         res[field.name] = res[field.name][0]
+                elif (
+                    (isinstance(data[path], list) or isinstance(data[path], str))
+                    and default_dict_key is not None
+                    and isinstance(field.sub_fields, list)
+                ):
+                    if isinstance(data[path], str):
+                        d1 = [data[path]]
+                    else:
+                        d1 = data[path]
+                    res[field.name] = [{default_dict_key: ent} for ent in d1]
+                elif (isinstance(data[path], list) or isinstance(data[path], str)) and default_dict_key is not None:
+                    if isinstance(data[path], list):
+                        d1 = data[path][0]
+                    else:
+                        d1 = data[path]
+                    res[field.name] = {default_dict_key: d1}
                 elif isinstance(data[path], list):
                     anchor = self.get_anchor_element_from_model(model=field.type_)
                     res[field.name] = self.filter_sparql(
