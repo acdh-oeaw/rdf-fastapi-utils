@@ -55,6 +55,8 @@ class RDFUtilsModelBaseClass(BaseModel):
             typing.List[dict] | None: list of dictionaries containing keys and values
         """
         if isinstance(data, list):
+            if len(data) == 0:
+                return []
             if not isinstance(data[0], dict):
                 return data
         if isinstance(data, dict):
