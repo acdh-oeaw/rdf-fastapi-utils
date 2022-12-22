@@ -83,7 +83,7 @@ class RDFUtilsModelBaseClass(BaseModel):
                     if key not in list_of_keys:
                         list_of_keys.append(key)
         if anchor is not None:
-            lst_unique_vals = set([x[anchor] for x in data])
+            lst_unique_vals = set([x[anchor] for x in data if anchor in x])
             res_fin_anchor = []
             for item in lst_unique_vals:
                 add_vals = []
