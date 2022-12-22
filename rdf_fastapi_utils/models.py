@@ -20,7 +20,7 @@ class FieldConfigurationRDF(BaseModel):
     serialization_class_callback: Callable | None = Field(
         None,
         description="Callback function for deciding on the correct class for serialization. Function\
-            gets two parameters: field and RDFData and needs to return the class to use.",
+            gets two parameters: fields (array) and RDFData and needs to return a list of tuples with `(field, [data])`.",
     )
     default_dict_key: constr(regex="^[a-zA-Z0-9_]+$") | None = Field(
         None, desctiption="In a related field use this key as default"
@@ -156,12 +156,13 @@ class RDFUtilsModelBaseClass(BaseModel):
 
     def get_anchor_element_from_model(self, model: BaseModel) -> typing.Tuple[str, ModelField] | None:
         """takes a model class and returns a tuple of the anchor element and the field class"""
-        for f_name, f_class in model.__fields__.items():
-            f_conf = f_class.field_info.extra.get("rdfconfig", object())
-            if getattr(f_conf, "anchor", False):
-                if getattr(f_conf, "path", False):
-                    f_name = getattr(f_conf, "path")
-                return f_name, f_class
+        if hasattr(model, "__fields__"):
+            for f_name, f_class in model.__fields__.items():
+                f_conf = f_class.field_info.extra.get("rdfconfig", object())
+                if getattr(f_conf, "anchor", False):
+                    if getattr(f_conf, "path", False):
+                        f_name = getattr(f_conf, "path")
+                    return f_name, f_class
         return None
 
     def get_rdf_variables_from_field(self, field: ModelField) -> typing.List[str]:
@@ -175,6 +176,8 @@ class RDFUtilsModelBaseClass(BaseModel):
         return res
 
     def get_rdf_variables_from_model(self, model: BaseModel) -> typing.List[str]:
+        if not hasattr(model, "__fields__"):
+            return []
         res = []
         for f_name, f_class in model.__fields__.items():
             f_conf = f_class.field_info.extra.get("rdfconfig", object())
@@ -199,9 +202,18 @@ class RDFUtilsModelBaseClass(BaseModel):
             if path is None:
                 path = field.name
             if path not in data:
+                # res[field.name] = data
+                anchor = self.get_anchor_element_from_model(model=field.type_)
+                res[field.name] = self.filter_sparql(
+                    data=data["_additional_values"] if "_additional_values" in data else data,
+                    # data=data,
+                    anchor=anchor[0] if anchor is not None else None,
+                    list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
+                )
                 continue
-            if hasattr(field.type_, "__fields__"):  # FIXME: this test doesnt catch all the options
-
+            if hasattr(field.type_, "__fields__") or hasattr(
+                field.type_, "__args__"
+            ):  # FIXME: this test doesnt catch all the options
                 scallback_attr = getattr(field.field_info.extra.get("rdfconfig"), "serialization_class_callback", None)
                 default_dict_key = getattr(field.field_info.extra.get("rdfconfig"), "default_dict_key", None)
                 if scallback_attr is not None:
@@ -209,14 +221,15 @@ class RDFUtilsModelBaseClass(BaseModel):
                     if not isinstance(data[path], list):
                         data[path] = [data[path]]
                     # for ent in data[path]:
-                    cb = scallback_attr(field, data[path])
-                    anchor = self.get_anchor_element_from_model(model=cb)
-                    rdf_data = self.filter_sparql(
-                        data=data["_additional_values"] if "_additional_values" in data else data[path],
-                        anchor=anchor[0],
-                        list_of_keys=self.get_rdf_variables_from_model(model=cb),
-                    )
-                    res[field.name] = [cb(**ent) for ent in rdf_data]
+                    cb1 = scallback_attr(field, data[path])
+                    for cb in cb1:
+                        anchor = self.get_anchor_element_from_model(model=cb[0])
+                        rdf_data = self.filter_sparql(
+                            data=cb[1],
+                            anchor=anchor[0],
+                            list_of_keys=self.get_rdf_variables_from_model(model=cb[0]),
+                        )
+                        res[field.name].extend([cb[0](**ent) for ent in rdf_data])
                     if field.outer_type_.__origin__ != list:
                         res[field.name] = res[field.name][0]
                 elif (

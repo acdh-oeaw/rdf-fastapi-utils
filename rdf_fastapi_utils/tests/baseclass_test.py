@@ -5,11 +5,15 @@ from pydantic import Field
 from rdf_fastapi_utils.models import FieldConfigurationRDF, RDFUtilsModelBaseClass
 
 
+def results_callback(field, data):
+    return [(TCPersonFull, data)]
+
+
 class TCPaginatedResponse(RDFUtilsModelBaseClass):
     count: int = Field(..., rdfconfig=FieldConfigurationRDF(path="count"))
     results: list[Union["TCPersonFull", "TCPlaceFull"]] = Field(
         ...,
-        rdfconfig=FieldConfigurationRDF(path="results", serialization_class_callback=lambda field, item: TCPersonFull),
+        rdfconfig=FieldConfigurationRDF(path="results", serialization_class_callback=results_callback),
     )
 
 
@@ -31,6 +35,7 @@ class TCEventFull(RDFUtilsModelBaseClass):
 
 
 TCPaginatedResponse.update_forward_refs()
+TCPlaceFull.update_forward_refs()
 TCPersonFull.update_forward_refs()
 TCEventFull.update_forward_refs()
 
