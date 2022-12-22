@@ -15,7 +15,7 @@ class FieldConfigurationRDF(BaseModel):
     anchor: bool = Field(False, description="Whether to use the RDF variable as an anchor")
     default_value: Any = Field(None, description="Default value to use when populating the field")
     callback_function: Callable | None = Field(
-        None, description="Callback for posprocessing data from the RDF variable"
+        None, description="Callback for postprocessing data from the RDF variable"
     )
     serialization_class_callback: Callable | None = Field(
         None,
