@@ -2,7 +2,7 @@ from copy import deepcopy
 import datetime
 from typing import Any, Callable, List, Tuple
 import typing
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, Field, HttpUrl, constr
 from pydantic.fields import ModelField
 
 
@@ -24,6 +24,12 @@ class FieldConfigurationRDF(BaseModel):
     )
     default_dict_key: constr(regex="^[a-zA-Z0-9_]+$") | None = Field(
         None, desctiption="In a related field use this key as default"
+    )
+    encode_function: typing.Tuple[Callable, HttpUrl] | None = Field(
+        None,
+        description="Callback for encoding data from the RDF variable. E.g for base64 encoding of URIs.\
+            Tuple of function and base url. The function gets two parameters passed: the original data of the \
+                field and the base url.",
     )
 
 
@@ -278,6 +284,14 @@ class RDFUtilsModelBaseClass(BaseModel):
                 data[field.name] = cb(field, data[field.name], data)
         return data
 
+    def encode_data(self, data: dict) -> dict:
+
+        for field in self.__fields__.values():
+            cb = getattr(field.field_info.extra.get("rdfconfig"), "encode_function", None)
+            if cb is not None and field.name in data:
+                data[field.name] = cb[0](data[field.name], cb[1])
+        return data
+
     def __init__(__pydantic_self__, **data: Any) -> None:
         if "_results" in data:
             data = data["_results"]
@@ -285,6 +299,7 @@ class RDFUtilsModelBaseClass(BaseModel):
             data = __pydantic_self__.filter_sparql(data, anchor=anchor[0])[0]
         data = __pydantic_self__.map_fields_data(data=data)
         data = __pydantic_self__.post_process_data(data=data)
+        data = __pydantic_self__.encode_data(data=data)
         # if "label" in data:
         #     data["label"] = data["label"][0]
         super().__init__(**data)
