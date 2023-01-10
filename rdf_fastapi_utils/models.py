@@ -261,7 +261,14 @@ class RDFUtilsModelBaseClass(BaseModel):
                         anchor=anchor[0] if anchor is not None else None,
                         list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
                     )
-                    print("test")
+                elif field.sub_fields is None:
+                    anchor = self.get_anchor_element_from_model(model=field.type_)
+                    res[field.name] = self.filter_sparql(
+                        # data=data["_additional_values"] if "_additional_values" in data else data,
+                        data=data,
+                        anchor=anchor[0] if anchor is not None else None,
+                        list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
+                    )[0]
                 else:
                     anchor = self.get_anchor_element_from_model(model=field.type_)
                     res[field.name] = self.filter_sparql(
@@ -299,6 +306,10 @@ class RDFUtilsModelBaseClass(BaseModel):
         data = __pydantic_self__.map_fields_data(data=data)
         data = __pydantic_self__.post_process_data(data=data)
         data = __pydantic_self__.encode_data(data=data)
+        # if __pydantic_self__.__class__.__name__ == "Entity":
+        #     if "gender" in data:
+        #         if isinstance(data["gender"], list):
+        #             data["gender"] = data["gender"][0]
         # if "label" in data:
         #     data["label"] = data["label"][0]
         super().__init__(**data)
