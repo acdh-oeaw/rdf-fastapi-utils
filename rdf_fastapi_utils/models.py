@@ -30,6 +30,10 @@ class FieldConfigurationRDF(BaseModel):
         description="Callback for encoding data from the RDF variable. E.g for base64 encoding of URIs.\
             The function gets only the value of the field passed and returns the encoded field.",
     )
+    bypass_data_mapping: bool = Field(
+        False,
+        description="Wether to bypass the automated data mapping, e.g. to do it in a dedicated callback function.",
+    )
 
 
 class RDFUtilsModelBaseClass(BaseModel):
@@ -216,8 +220,10 @@ class RDFUtilsModelBaseClass(BaseModel):
                     list_of_keys=self.get_rdf_variables_from_model(model=field.type_),
                 )
                 continue
-            if hasattr(field.type_, "__fields__") or hasattr(
-                field.type_, "__args__"
+            if (
+                hasattr(field.type_, "__fields__")
+                or hasattr(field.type_, "__args__")
+                and not getattr(field.field_info.extra.get("rdfconfig"), "bypass_data_mapping", False)
             ):  # FIXME: this test doesnt catch all the options
                 scallback_attr = getattr(field.field_info.extra.get("rdfconfig"), "serialization_class_callback", None)
                 default_dict_key = getattr(field.field_info.extra.get("rdfconfig"), "default_dict_key", None)
@@ -287,7 +293,8 @@ class RDFUtilsModelBaseClass(BaseModel):
         for field in self.__fields__.values():
             cb = getattr(field.field_info.extra.get("rdfconfig"), "callback_function", None)
             if cb is not None and field.name in data:
-                data[field.name] = cb(field, data[field.name], data)
+                if data[field.name] is not None:
+                    data[field.name] = cb(field, data[field.name], data)
         return data
 
     def encode_data(self, data: dict) -> dict:
@@ -295,7 +302,8 @@ class RDFUtilsModelBaseClass(BaseModel):
         for field in self.__fields__.values():
             cb = getattr(field.field_info.extra.get("rdfconfig"), "encode_function", None)
             if cb is not None and field.name in data:
-                data[field.name] = cb(data[field.name])
+                if data[field.name] is not None:
+                    data[field.name] = cb(data[field.name])
         return data
 
     def __init__(__pydantic_self__, **data: Any) -> None:
