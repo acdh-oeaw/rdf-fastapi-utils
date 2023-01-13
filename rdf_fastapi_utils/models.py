@@ -339,7 +339,10 @@ class RDFUtilsModelBaseClass(BaseModel):
                     while len(c_back) > 0:
                         d1 = data_copy
                         for val in c_back[:-1]:
-                            d1 = d1[val]
+                            if val in d1:
+                                d1 = d1[val]
+                            else:
+                                break
                         try:
                             del d1[c_back[-1]]
                             break
