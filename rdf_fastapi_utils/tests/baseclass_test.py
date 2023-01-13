@@ -9,6 +9,10 @@ def results_callback(field, data):
     return [(TCPersonFull, data)]
 
 
+def results_callback_with_error(field, data):
+    return [(TCPersonFullWithError, data)]
+
+
 class TCPaginatedResponse(RDFUtilsModelBaseClass):
     count: int = Field(..., rdfconfig=FieldConfigurationRDF(path="count"))
     results: list[Union["TCPersonFull", "TCPlaceFull"]] = Field(
@@ -34,10 +38,41 @@ class TCEventFull(RDFUtilsModelBaseClass):
     label: str = Field(..., rdfconfig=FieldConfigurationRDF(path="eventLabel"))
 
 
+class TCPaginatedResponseWithError(RDFUtilsModelBaseClass):
+    count: int = Field(..., rdfconfig=FieldConfigurationRDF(path="count"))
+    results: list[Union["TCPersonFullWithError", "TCPlaceFull"]] = Field(
+        ...,
+        rdfconfig=FieldConfigurationRDF(path="results", serialization_class_callback=results_callback_with_error),
+    )
+
+
+class TCPersonFullWithError(RDFUtilsModelBaseClass):
+    id: str = Field(..., rdfconfig=FieldConfigurationRDF(anchor=True, path="person"))
+    name: str = Field(..., rdfconfig=FieldConfigurationRDF(path="entityLabel"))
+    events: list["TCEventFullWithError"] = None
+
+    class Config:
+        RDF_utils_catch_errors = True
+        RDF_utils_error_key = "error"
+        RDF_utils_move_errors_to_top = True
+
+
+class TCEventFullWithError(RDFUtilsModelBaseClass):
+    id: str = Field(..., rdfconfig=FieldConfigurationRDF(anchor=True, path="event"))
+    label: str = Field(..., rdfconfig=FieldConfigurationRDF(path="eventLabel"))
+
+    class Config:
+        RDF_utils_catch_errors = True
+        RDF_utils_error_key = "error"
+        RDF_utils_move_errors_to_top = True
+
+
 TCPaginatedResponse.update_forward_refs()
 TCPlaceFull.update_forward_refs()
 TCPersonFull.update_forward_refs()
 TCEventFull.update_forward_refs()
+TCPersonFullWithError.update_forward_refs()
+TCPaginatedResponseWithError.update_forward_refs()
 
 
 class TestInTaViaBaseClass(unittest.TestCase):
@@ -78,6 +113,7 @@ class TestInTaViaBaseClass(unittest.TestCase):
         self.assertEqual(len(res.results[0].events), 14)
 
     def test_validation_errors(self):
+        """test if validation errors are raised correctly when a required field is missing"""
         testdata = self.test_data_events.copy()
         event = testdata["results"][0]["event"]
         idx = 0
@@ -86,3 +122,5 @@ class TestInTaViaBaseClass(unittest.TestCase):
             idx += 1
         with self.assertRaises(ValidationError):
             TCPaginatedResponse(**testdata)
+        x = TCPaginatedResponseWithError(**testdata)
+        print("test")

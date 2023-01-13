@@ -2,7 +2,7 @@ from copy import deepcopy
 import datetime
 from typing import Any, Callable, List, Tuple
 import typing
-from pydantic import BaseModel, Field, HttpUrl, constr
+from pydantic import BaseModel, Field, HttpUrl, ValidationError, constr
 from pydantic.fields import ModelField
 
 
@@ -37,6 +37,13 @@ class FieldConfigurationRDF(BaseModel):
 
 
 class RDFUtilsModelBaseClass(BaseModel):
+    """Base class for models that use RDF data"""
+
+    class Config:
+        RDF_utils_catch_errors = False
+        RDF_utils_error_key = "error"
+        RDF_utils_move_errors_to_top = False
+
     @staticmethod
     def harm_filter_sparql(data: list) -> list | None:
         for ent in data:  # FIXME: this is a hack to fix the problem with the filter_sparql function
@@ -320,4 +327,26 @@ class RDFUtilsModelBaseClass(BaseModel):
         #             data["gender"] = data["gender"][0]
         # if "label" in data:
         #     data["label"] = data["label"][0]
-        super().__init__(**data)
+        if __pydantic_self__.Config.RDF_utils_catch_errors:
+            try:
+                super().__init__(**data)
+            except ValidationError as e:
+                print("Error in model", __pydantic_self__.__class__.__name__, e)
+                data["_error"] = e
+                data_copy = deepcopy(data)
+                for err in e.errors():
+                    c_back = list(err["loc"])
+                    while len(c_back) > 0:
+                        d1 = data_copy
+                        for val in c_back[:-1]:
+                            d1 = d1[val]
+                        try:
+                            del d1[c_back[-1]]
+                            break
+                        except (KeyError, IndexError):
+                            if len(c_back) == 1:
+                                break
+                            del c_back[-1]
+                super().__init__(**data_copy)
+        else:
+            super().__init__(**data)
