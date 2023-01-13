@@ -1,7 +1,7 @@
 from typing import Union
 import unittest
 import json
-from pydantic import Field
+from pydantic import Field, ValidationError
 from rdf_fastapi_utils.models import FieldConfigurationRDF, RDFUtilsModelBaseClass
 
 
@@ -76,3 +76,13 @@ class TestInTaViaBaseClass(unittest.TestCase):
     def test_model_field(self):
         res = TCPaginatedResponse(**self.test_data_events)
         self.assertEqual(len(res.results[0].events), 14)
+
+    def test_validation_errors(self):
+        testdata = self.test_data_events.copy()
+        event = testdata["results"][0]["event"]
+        idx = 0
+        while testdata["results"][idx]["event"] == event:
+            del testdata["results"][idx]["eventLabel"]
+            idx += 1
+        with self.assertRaises(ValidationError):
+            TCPaginatedResponse(**testdata)
