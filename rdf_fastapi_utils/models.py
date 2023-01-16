@@ -6,6 +6,36 @@ from pydantic import BaseModel, Field, HttpUrl, ValidationError, constr
 from pydantic.fields import ModelField
 
 
+def removeNullNoneEmpty(ob):
+    l = {}
+    check = False
+    for k, v in ob.items():
+        if isinstance(v, dict):
+            x = removeNullNoneEmpty(v)
+            if len(x.keys()) > 0:
+                l[k] = x
+            if x != v:
+                check = True
+        elif isinstance(v, list):
+            p = []
+            for c in v:
+                if isinstance(c, dict):
+                    x = removeNullNoneEmpty(c)
+                    if len(x.keys()) > 0:
+                        p.append(x)
+                elif c is not None and c != "":
+                    p.append(c)
+            if len(p) > 0:
+                l[k] = p
+            if p != v:
+                check = True
+        elif v is not None and v != "":
+            l[k] = v
+    if check:
+        l = removeNullNoneEmpty(l)
+    return l
+
+
 class FieldConfigurationRDF(BaseModel):
     """Configuration for how to use RDF data in the field"""
 
@@ -41,8 +71,8 @@ class RDFUtilsModelBaseClass(BaseModel):
 
     class Config:
         RDF_utils_catch_errors = False
-        RDF_utils_error_key = "error"
-        RDF_utils_move_errors_to_top = False
+        RDF_utils_error_field_name = "errors"
+        # RDF_utils_move_errors_to_top = False FIXME: add again when #3 is resolved
 
     @staticmethod
     def harm_filter_sparql(data: list) -> list | None:
@@ -339,17 +369,30 @@ class RDFUtilsModelBaseClass(BaseModel):
                     while len(c_back) > 0:
                         d1 = data_copy
                         for val in c_back[:-1]:
-                            if val in d1:
+                            if val in d1 or (isinstance(d1, list) and val < len(d1)):
                                 d1 = d1[val]
                             else:
                                 break
                         try:
-                            del d1[c_back[-1]]
+                            error_key = __pydantic_self__.Config.RDF_utils_error_field_name
+                            prev_error = None
+                            if isinstance(d1[c_back[-1]], dict) and error_key in d1[c_back[-1]]:
+                                prev_error = d1[c_back[-1]][error_key]
+                            d1[c_back[-1]] = None
+                            if data_copy[error_key] is None:
+                                data_copy[error_key] = []
+                            if str(e).replace("\n ", "; ").replace("\n", "; ") not in data_copy[error_key]:
+                                data_copy[error_key].append(str(e).replace("\n ", "; ").replace("\n", "; "))
+                            if prev_error is not None:
+                                for err2 in prev_error:
+                                    if err2 not in data_copy[error_key]:
+                                        data_copy[error_key].append(err2)
                             break
                         except (KeyError, IndexError):
                             if len(c_back) == 1:
                                 break
                             del c_back[-1]
+                data_copy = removeNullNoneEmpty(data_copy)
                 super().__init__(**data_copy)
         else:
             super().__init__(**data)
