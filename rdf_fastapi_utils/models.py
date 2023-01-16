@@ -2,8 +2,38 @@ from copy import deepcopy
 import datetime
 from typing import Any, Callable, List, Tuple
 import typing
-from pydantic import BaseModel, Field, HttpUrl, constr
+from pydantic import BaseModel, Field, HttpUrl, ValidationError, constr
 from pydantic.fields import ModelField
+
+
+def removeNullNoneEmpty(ob):
+    l = {}
+    check = False
+    for k, v in ob.items():
+        if isinstance(v, dict):
+            x = removeNullNoneEmpty(v)
+            if len(x.keys()) > 0:
+                l[k] = x
+            if x != v:
+                check = True
+        elif isinstance(v, list):
+            p = []
+            for c in v:
+                if isinstance(c, dict):
+                    x = removeNullNoneEmpty(c)
+                    if len(x.keys()) > 0:
+                        p.append(x)
+                elif c is not None and c != "":
+                    p.append(c)
+            if len(p) > 0:
+                l[k] = p
+            if p != v:
+                check = True
+        elif v is not None and v != "":
+            l[k] = v
+    if check:
+        l = removeNullNoneEmpty(l)
+    return l
 
 
 class FieldConfigurationRDF(BaseModel):
@@ -37,6 +67,13 @@ class FieldConfigurationRDF(BaseModel):
 
 
 class RDFUtilsModelBaseClass(BaseModel):
+    """Base class for models that use RDF data"""
+
+    class Config:
+        RDF_utils_catch_errors = False
+        RDF_utils_error_field_name = "errors"
+        # RDF_utils_move_errors_to_top = False FIXME: add again when #3 is resolved
+
     @staticmethod
     def harm_filter_sparql(data: list) -> list | None:
         for ent in data:  # FIXME: this is a hack to fix the problem with the filter_sparql function
@@ -320,4 +357,42 @@ class RDFUtilsModelBaseClass(BaseModel):
         #             data["gender"] = data["gender"][0]
         # if "label" in data:
         #     data["label"] = data["label"][0]
-        super().__init__(**data)
+        if __pydantic_self__.Config.RDF_utils_catch_errors:
+            try:
+                super().__init__(**data)
+            except ValidationError as e:
+                print("Error in model", __pydantic_self__.__class__.__name__, e)
+                data["_error"] = e
+                data_copy = deepcopy(data)
+                for err in e.errors():
+                    c_back = list(err["loc"])
+                    while len(c_back) > 0:
+                        d1 = data_copy
+                        for val in c_back[:-1]:
+                            if val in d1 or (isinstance(d1, list) and val < len(d1)):
+                                d1 = d1[val]
+                            else:
+                                break
+                        try:
+                            error_key = __pydantic_self__.Config.RDF_utils_error_field_name
+                            prev_error = None
+                            if isinstance(d1[c_back[-1]], dict) and error_key in d1[c_back[-1]]:
+                                prev_error = d1[c_back[-1]][error_key]
+                            d1[c_back[-1]] = None
+                            if data_copy[error_key] is None:
+                                data_copy[error_key] = []
+                            if str(e).replace("\n ", "; ").replace("\n", "; ") not in data_copy[error_key]:
+                                data_copy[error_key].append(str(e).replace("\n ", "; ").replace("\n", "; "))
+                            if prev_error is not None:
+                                for err2 in prev_error:
+                                    if err2 not in data_copy[error_key]:
+                                        data_copy[error_key].append(err2)
+                            break
+                        except (KeyError, IndexError):
+                            if len(c_back) == 1:
+                                break
+                            del c_back[-1]
+                data_copy = removeNullNoneEmpty(data_copy)
+                super().__init__(**data_copy)
+        else:
+            super().__init__(**data)
