@@ -53,7 +53,7 @@ class TCPersonFullWithError(RDFUtilsModelBaseClass):
 
     class Config:
         RDF_utils_catch_errors = True
-        RDF_utils_error_key = "error"
+        RDF_utils_error_field_name = "error"
         RDF_utils_move_errors_to_top = True
 
 
@@ -63,7 +63,7 @@ class TCEventFullWithError(RDFUtilsModelBaseClass):
 
     class Config:
         RDF_utils_catch_errors = True
-        RDF_utils_error_key = "error"
+        RDF_utils_error_field_name = "error"
         RDF_utils_move_errors_to_top = True
 
 
