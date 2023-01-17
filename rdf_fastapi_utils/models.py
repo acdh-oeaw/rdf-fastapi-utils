@@ -347,7 +347,11 @@ class RDFUtilsModelBaseClass(BaseModel):
         if "_results" in data:
             data = data["_results"]
             anchor = __pydantic_self__.get_anchor_element_from_model(model=__pydantic_self__)
-            data = __pydantic_self__.filter_sparql(data, anchor=anchor[0])[0]
+            data = __pydantic_self__.filter_sparql(
+                data,
+                anchor=anchor[0],
+                list_of_keys=__pydantic_self__.get_rdf_variables_from_model(model=__pydantic_self__),
+            )[0]
         data = __pydantic_self__.map_fields_data(data=data)
         data = __pydantic_self__.post_process_data(data=data)
         data = __pydantic_self__.encode_data(data=data)
