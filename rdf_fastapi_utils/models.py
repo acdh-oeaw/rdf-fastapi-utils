@@ -250,6 +250,9 @@ class RDFUtilsModelBaseClass(BaseModel):
             if path not in data:
                 # res[field.name] = data
                 anchor = self.get_anchor_element_from_model(model=field.type_)
+                if "_additional_values" in data:
+                    if anchor is None and path in data["_additional_values"]:
+                        res[field.name] = data["_additional_values"][path]
                 res[field.name] = self.filter_sparql(
                     data=data["_additional_values"] if "_additional_values" in data else data,
                     # data=data,
@@ -352,9 +355,23 @@ class RDFUtilsModelBaseClass(BaseModel):
                 anchor=anchor[0],
                 list_of_keys=__pydantic_self__.get_rdf_variables_from_model(model=__pydantic_self__),
             )[0]
+        sort_key = getattr(__pydantic_self__.Config, "sort_key", None)
+        if sort_key is not None:
+            original_order = []
+            for item in data[sort_key["object list"]]:
+                if item[sort_key["original key"]] not in original_order:
+                    original_order.append(item[sort_key["original key"]])
         data = __pydantic_self__.map_fields_data(data=data)
         data = __pydantic_self__.post_process_data(data=data)
         data = __pydantic_self__.encode_data(data=data)
+        if sort_key is not None:
+            new_data = []
+            for order_item in original_order:
+                for item in data[sort_key["object list"]]:
+                    if item[sort_key["original key"]] == order_item:
+                        new_data.append(item)
+            data[sort_key["object list"]] = new_data
+
         # if __pydantic_self__.__class__.__name__ == "Entity":
         #     if "gender" in data:
         #         if isinstance(data["gender"], list):
