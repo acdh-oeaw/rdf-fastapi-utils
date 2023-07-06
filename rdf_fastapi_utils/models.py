@@ -134,7 +134,7 @@ class RDFUtilsModelBaseClass(BaseModel):
             for item in lst_unique_vals:
                 add_vals = []
                 res1 = {}
-                for i2 in list(filter(lambda d: d[anchor] == item, data)):
+                for i2 in list(filter(lambda d: d[anchor] == item, [x for x in data if anchor in x])):
                     add_vals_dict = deepcopy(i2)
                     for k, v in i2.items():
                         if k in list_of_keys or k == anchor:
